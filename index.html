@@ -21,6 +21,7 @@
         minX: 0,
         minY: 0,
         scaleFactor: 4, // Global graphics scaling factor.
+        tetQueueLength: 6,
       };
 
       const colours = {
@@ -42,7 +43,7 @@
       const mapZeroToN = n => f => new Array(n).fill(null).map((_, i) => f(i));
 
       // Embed these in square matrices for easy rotation!
-      const tetrominoes = [
+      const tets = [
         // I
         [
           [0, 0, 0, 0],
@@ -129,7 +130,7 @@
         ];
       };
 
-      const drawTetromino = ({ colour, matrix, x, y }) => {
+      const drawTet = ({ colour, matrix, x, y }) => {
         const res = [];
 
         matrix.forEach((row, r) => {
@@ -210,51 +211,67 @@
       const tetsInit = [
         {
           colour: colours.orange,
-          matrix: tetrominoes[tetI],
+          matrix: tets[tetI],
           x: 0,
           y: 0,
         },
         {
           colour: colours.red,
-          matrix: tetrominoes[tetT],
+          matrix: tets[tetT],
           x: 5,
           y: 0,
         },
         {
           colour: colours.green,
-          matrix: tetrominoes[tetO],
+          matrix: tets[tetO],
           x: 0,
           y: 5,
         },
         {
           colour: colours.cyan,
-          matrix: tetrominoes[tetS],
+          matrix: tets[tetS],
           x: 5,
           y: 5,
         },
         {
           colour: colours.magenta,
-          matrix: tetrominoes[tetZ],
+          matrix: tets[tetZ],
           x: 0,
           y: 10,
         },
         {
           colour: colours.blue,
-          matrix: tetrominoes[tetJ],
+          matrix: tets[tetJ],
           x: 5,
           y: 10,
         },
         {
           colour: colours.yellow,
-          matrix: tetrominoes[tetL],
+          matrix: tets[tetL],
           x: 0,
           y: 15,
         },
       ];
 
+      const populateTetQueue = (queue) => {
+        const { tetQueueLength } = params;
+        const { red } = colours;
+
+        // TODO: Consider nonuniform probability distribution?
+        const randomTet = () => ({
+          colour: red, // TODO: Random colour.
+          matrix: tets[Math.floor(Math.random() * tets.length)], // TODO: Random rotation.
+        });
+
+        const freshTets = mapZeroToN(tetQueueLength - queue.length)(randomTet);
+        
+       return [...queue, ...freshTets];
+      };
+
       // Keep of the global, mutable state in one place.
       let state = {
         field: fieldInit,
+        queue: populateTetQueue([]),
         tets: tetsInit,
       };
 
@@ -314,7 +331,32 @@
         };
       };
 
-      const render = ({ field, tets }) => {
+      const drawTetQueue = (queue) => {
+        const res = [];
+        const padSize = 6; // Max tet size is 4; this gives us enough padding.
+
+        queue.forEach((tet, i) => {
+          const tetToRender = {
+            ...tet,
+            x: 1,
+            y: 1 + i * padSize,
+          };
+
+          res.push(...drawTet(tetToRender));
+        });
+
+        // Draw a box to highlight which element of the queue is the next tet.
+        const { matrix, colour } = queue[0];
+        const n = matrix.length + 2;
+        iterZeroToN(2)((i) => {
+          res.push(line(i * n, 0, i * n, n, 'black'))
+          res.push(line(0, i * n, n, i * n, 'black'));
+        });
+
+        return res;
+      };
+
+      const render = ({ field, queue, tets }) => {
         const renderer = renderObj([
           {
             transform: 'scale',
@@ -328,16 +370,29 @@
           }
         ]);
 
+        const rendererQueue = renderObj([
+          {
+            transform: 'scale',
+            x: 15,
+            y: 15,
+          },
+          {
+            transform: 'translate',
+            x: 150,
+            y: 50,
+          }
+        ]);
+
         const { maxX, maxY, minX, minY } = params;
         ctx.clearRect(minX, minY, maxX, maxY);
 
-        tets.forEach((tet) => drawTetromino(tet).forEach(renderer));
+        drawTetQueue(queue).forEach(rendererQueue);
+        tets.forEach((tet) => drawTet(tet).forEach(renderer));
         drawField(field).forEach(renderer);
         drawBoard().forEach(renderer);
       }
 
-      const update = ({ field, tets }) => {
-        const fieldUpdated = clearFullLines(field).field;
+      const update = ({ field, queue, tets }) => {
         const tetsUpdated = [];
 
         tets.forEach((tet) => {
@@ -355,7 +410,8 @@
         });
 
         return {
-          field: fieldUpdated,
+          field: clearFullLines(field).field,
+          queue: populateTetQueue(queue),
           tets: tetsUpdated,
         };
       };
