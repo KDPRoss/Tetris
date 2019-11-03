@@ -397,28 +397,11 @@
         const { field, keysDown, queue, tets } = state;
         const tetsUpdated = [];
 
-        console.log(keysDown);
-
         tets.forEach((tet) => {
           const tetMoved = {
             ...tet,
             y: tet.y + 1,
           };
-
-          keysDown.forEach((keyCode) => {
-            switch(keyCode) {
-              case leftArrow:
-                return -- tetMoved.x;
-              case rightArrow:
-                return ++ tetMoved.x;
-              case upArrow:
-                tetMoved.matrix = rotateClockwise(tetMoved.matrix);
-                return;
-              case downArrow:
-                tetMoved.matrix = rotateAnticlockwise(tetMoved.matrix);
-                return;
-            }
-          });
 
           if (checkTetCollision(field, tetMoved)) {
             commitTetToField(field, tet);
@@ -473,10 +456,54 @@
         state.field[params.boardHeight - 3][i + 5] = null;
       });
 
+      const handleInput = () => {
+        const { field, keysDown, tets } = state;
+        const tetsUpdated = [];
+        let needRerender = false;
+
+        tets.forEach((tet) => {
+          const tetMoved = { ...tet };
+
+          keysDown.forEach((keyCode) => {
+            switch(keyCode) {
+              case leftArrow:
+                return -- tetMoved.x;
+              case rightArrow:
+                return ++ tetMoved.x;
+              case upArrow:
+                tetMoved.matrix = rotateClockwise(tetMoved.matrix);
+                return;
+              case downArrow:
+                tetMoved.matrix = rotateAnticlockwise(tetMoved.matrix);
+                return;
+            }
+          });
+
+          if (checkTetCollision(field, tetMoved)) {
+            tetsUpdated.push(tet);
+          } else {
+            tetsUpdated.push(tetMoved);
+            needRerender = true;
+          }
+        });
+
+        state = {
+          ...state,
+          field,
+          keysDown,
+          tets: tetsUpdated,
+        }
+
+        if (needRerender) {
+          render(state);
+        }
+      };
+
       document.addEventListener('keydown', keyDownHandler);
       document.addEventListener('keyup', keyUpHandler);
 
       render(state);
+      setInterval(handleInput, 75);
       setInterval(tick, 1000);
     </script>
   </body>
