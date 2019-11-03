@@ -16,6 +16,7 @@
         // Arbitrary; Internet tells me that 10x20 is 'standard' size.
         boardHeight: 20, 
         boardWidth: 10,
+        keyRepeatTimeout: 150,
         maxX: 800,
         maxY: 600,
         minX: 0,
@@ -29,13 +30,14 @@
         blue: '#0000ff',
         cyan: '#00ffff',
         green: '#00ff00',
+        grey: '#888888',
         magenta: '#ff00ff',
         orange: '#ffa500',
         red: '#ff0000',
         yellow: '#ffff00',
       };
 
-      const colourNames = Object.keys(colours).filter(x => x !== 'black');
+      const colourNames = Object.keys(colours).filter(x => !['black', 'grey'].includes(x));
 
       // Abstract representation of a graphics.
       const line = (x1, y1, x2, y2, colour) => ({ render: 'line', colour, p1: [x1, y1], p2: [x2, y2] });
@@ -48,9 +50,11 @@
       const oneOf = xs => xs[randInt(xs.length)];
 
       // Embed these in square matrices for easy rotation!
-      const tets = [
+      // Colours are arbitrary; found >0 online screenshots using this mapping.
+      const platonicTets = [
         // I
         [
+          'cyan',
           [0, 0, 0, 0],
           [1, 1, 1, 1],
           [0, 0, 0, 0],
@@ -58,35 +62,41 @@
         ],
         // O
         [
+          'yellow',
           [1, 1],
           [1, 1],
         ],
         // T
         [
+          'magenta',
           [0, 1, 0],
           [1, 1, 1],
           [0, 0, 0],
         ],
         // S
         [
+          'red',
           [0, 1, 1],
           [1, 1, 0],
           [0, 0, 0],
         ],
         // Z
         [
+          'green',
           [1, 1, 0],
           [0, 1, 1],
           [0, 0, 0],
         ],
         // J
         [
+          'blue',
           [1, 0, 0],
           [1, 1, 1],
           [0, 0, 0],
         ],
         // L
         [
+          'orange',
           [0, 0, 1],
           [1, 1, 1],
           [0, 0, 0],
@@ -210,57 +220,11 @@
         }
       };
 
-      const fieldInit = mapZeroToN(params.boardHeight)(_ => mapZeroToN(params.boardWidth)(_ => null));
-
-      // TODO: Remove all of this.
-      const tetsInit = [
-        {
-          colour: colours.orange,
-          matrix: tets[tetI],
-          x: 0,
-          y: 0,
-        },
-        {
-          colour: colours.red,
-          matrix: tets[tetT],
-          x: 5,
-          y: 0,
-        },
-        {
-          colour: colours.green,
-          matrix: tets[tetO],
-          x: 0,
-          y: 5,
-        },
-        {
-          colour: colours.cyan,
-          matrix: tets[tetS],
-          x: 5,
-          y: 5,
-        },
-        {
-          colour: colours.magenta,
-          matrix: tets[tetZ],
-          x: 0,
-          y: 10,
-        },
-        {
-          colour: colours.blue,
-          matrix: tets[tetJ],
-          x: 5,
-          y: 10,
-        },
-        {
-          colour: colours.yellow,
-          matrix: tets[tetL],
-          x: 0,
-          y: 15,
-        },
-      ];
+      const fieldInit = () => mapZeroToN(params.boardHeight)(_ => mapZeroToN(params.boardWidth)(_ => null));
 
       // TODO: Consider nonuniform probability distribution?
       const randomTet = () => {
-        let matrix = oneOf(tets);
+        let [colour, ...matrix] = oneOf(platonicTets);
 
         // Generate any ratation with equal probability.
         iterZeroToN(randInt(4))((_) => {
@@ -268,7 +232,7 @@
         });
 
         return {
-          colour: oneOf(colourNames),
+          colour,
           matrix,
           x: Math.floor(params.boardWidth / 2) - 2, // Little bit arbitrary; close to centering them.
           y: 0,
@@ -285,8 +249,9 @@
 
       // Keep of the global, mutable state in one place.
       let state = {
-        field: fieldInit,
+        field: fieldInit(),
         keysDown: new Set(),
+        keyRepeatDisabled: false,
         paused: false,
         queue: populateTetQueue([]),
         tets: [randomTet()],
@@ -344,8 +309,26 @@
 
         return {
           field: fieldUpdated,
-          count: res,
+          count: res, // Clearly, I was planning to keep score at *some* point!
         };
+      };
+
+      // This behaviour differs to any normal Tetris implementation: If the field is
+      // completely filled, just clear it. This is a digital toy, not a game: You
+      // can't win; you can't lose; there's no score.
+      const sanityCheckField = (field, tets) => {
+        let res = field;
+
+        tets.forEach((tet) => {
+          // This should only happen if a freshly-generated tet is in an invalid position,
+          // which should only happen if the field is totally full. Proof is left as an
+          // exercise for the reader.
+          if (checkTetCollision(field, tet)) {
+            res = fieldInit();
+          }
+        });
+
+        return res;
       };
 
       const drawTetQueue = (queue) => {
@@ -373,7 +356,7 @@
         return res;
       };
 
-      const render = ({ field, queue, tets }) => {
+      const render = ({ field, paused, queue, tets }) => {
         const renderer = renderObj([
           {
             transform: 'scale',
@@ -404,8 +387,17 @@
         ctx.clearRect(minX, minY, maxX, maxY);
 
         drawTetQueue(queue).forEach(rendererQueue);
-        tets.forEach((tet) => drawTet(tet).forEach(renderer));
-        drawField(field).forEach(renderer);
+
+        if (paused) {
+          const { grey } = colours;
+          const { boardHeight, boardWidth } = params;
+
+          renderer(rect(0, 0, boardWidth, boardHeight, grey));
+        } else {
+          tets.forEach((tet) => drawTet(tet).forEach(renderer));
+          drawField(field).forEach(renderer);
+        }
+
         drawBoard().forEach(renderer);
       }
 
@@ -414,7 +406,7 @@
         const tetsUpdated = [];
 
         if (paused) {
-          return;
+          return state;
         }
 
         tets.forEach((tet) => {
@@ -435,7 +427,7 @@
 
         return {
           ...state,
-          field: clearFullLines(field).field,
+          field: clearFullLines(sanityCheckField(field, tetsUpdated)).field,
           queue: populateTetQueue(queue),
           tets: tetsUpdated,
         };
@@ -468,30 +460,23 @@
         // Not sure if this is a WAT!? or AMAZE!
       const tick = () => render(state = update(state));
 
-      // TODO: Temp hack: Set up some full / partial rows to check that full-line
-      // detection / clearing logic is working.
-      let setFullRow = (n) => {
-        state.field[n] = mapZeroToN(params.boardWidth)(_ => 'cyan');
-      };
-      setFullRow(params.boardHeight - 1);
-      setFullRow(params.boardHeight - 2);
-      setFullRow(params.boardHeight - 3);
-      mapZeroToN(3)((i) => {
-        state.field[params.boardHeight - 3][i] = null;
-        state.field[params.boardHeight - 3][i + 5] = null;
-      });
-
       const handleInput = () => {
-        const { field, keysDown, tets } = state;
+        const { field, keysDown, paused, tets } = state;
         const tetsUpdated = [];
         let needRerender = false;
 
-        if (keysDown.has(pKey)) {
-          // state.paused = !state.paused;
+        if (!state.keyRepeatDisabled && keysDown.has(pKey)) {
+          const { keyRepeatTimeout } = params;
+
+          state.paused = !state.paused;
+
+          // Bit of a hack: Difficult to get a *single* pause event to register, else.
+          state.keyRepeatDisabled = true;
+          setTimeout(() => state.keyRepeatDisabled = false, keyRepeatTimeout);
         }
 
         if (state.paused) {
-          return;
+          return state;
         }
 
         tets.forEach((tet) => {
