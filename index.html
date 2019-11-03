@@ -147,16 +147,26 @@
 
       const drawField = field => {
         const { boardHeight, boardWidth } = params;
-        const { black } = colours;
+        const { black, red } = colours;
         const res = [];
 
-        iterZeroToN(boardHeight)(i => iterZeroToN(boardWidth)((j) => {
-          const colour = field[i][j];
+        iterZeroToN(boardHeight)((i) => {
+          if (fullLine(field[i])) {
+            // Highlight full row. (We're relying on the assumption that the grid will be
+            // drawn *above* the rects.)
+            res.push(rect(0, i, boardWidth, i + 1, red));
 
-          if (colour !== null) {
-            res.push(rect(j, i, j + 1, i + 1, colour));
+            return;
           }
-        }));
+
+          iterZeroToN(boardWidth)((j) => {
+            const colour = field[i][j];
+
+            if (colour !== null) {
+              res.push(rect(j, i, j + 1, i + 1, colour));
+            }
+          })
+        });
 
         return res;
       };
@@ -271,10 +281,33 @@
         }));
       };
 
-      const temp = () => {
-        const { maxX, maxY, minX, minY } = params;
-        ctx.clearRect(minX, minY, maxX, maxY);
+      const fullLine = row => row.indexOf(null) === -1;
 
+      const clearFullLines = (field) => {
+        let { boardHeight, boardWidth } = params;
+
+        let res = 0;
+        let fieldUpdated = [];
+        
+        field.forEach((row) => {
+          if (fullLine(row)) {
+            ++ res;
+          } else {
+            fieldUpdated.push(row);
+          }
+        });
+
+        iterZeroToN(res)((_) => {
+          fieldUpdated.unshift(mapZeroToN(boardWidth)(_ => null));
+        });
+
+        return {
+          field: fieldUpdated,
+          count: res,
+        };
+      };
+
+      const render = ({ field, tets }) => {
         const renderer = renderObj([
           {
             transform: 'scale',
@@ -288,16 +321,21 @@
           }
         ]);
 
-        const tetsUpdated = [];
+        const { maxX, maxY, minX, minY } = params;
+        ctx.clearRect(minX, minY, maxX, maxY);
 
         tets.forEach((tet) => drawTetromino(tet).forEach(renderer));
         drawField(field).forEach(renderer);
         drawBoard().forEach(renderer);
+      }
+
+      const update = ({ field, tets }) => {
+        const fieldUpdated = clearFullLines(field).field;
+        const tetsUpdated = [];
 
         tets.forEach((tet) => {
           const tetMoved = {
             ...tet,
-            matrix: rotateClockwise(tet.matrix),
             y: tet.y + 1,
           };
 
@@ -309,9 +347,35 @@
 
         });
 
-        tets = tetsUpdated;
+        return {
+          field: fieldUpdated,
+          tets: tetsUpdated,
+        };
       };
 
+      const temp = () => {
+        // TODO: Make the global state *this* rather than having multiple globals
+        // (`field`, `tets`).
+        const state = update({ field, tets });
+
+        render(state);
+
+        field = state.field;
+        tets = state.tets;
+      };
+
+      // TODO: Temp hack: Set up some full / partial rows to check that full-line
+      // detection / clearing logic is working.
+      let setFullRow = n => field[n] = mapZeroToN(params.boardWidth)(_ => 'cyan');
+      setFullRow(params.boardHeight - 1);
+      setFullRow(params.boardHeight - 2);
+      setFullRow(params.boardHeight - 3);
+      mapZeroToN(3)((i) => {
+        field[params.boardHeight - 3][i] = null;
+        field[params.boardHeight - 3][i + 5] = null;
+      });
+
+      render({ field, tets });
       setInterval(temp, 1000);
     </script>
   </body>
