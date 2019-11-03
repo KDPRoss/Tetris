@@ -204,9 +204,10 @@
         }
       };
 
-      let field = mapZeroToN(params.boardHeight)(_ => mapZeroToN(params.boardWidth)(_ => null));
+      const fieldInit = mapZeroToN(params.boardHeight)(_ => mapZeroToN(params.boardWidth)(_ => null));
 
-      let tets = [
+      // TODO: Remove all of this.
+      const tetsInit = [
         {
           colour: colours.orange,
           matrix: tetrominoes[tetI],
@@ -250,6 +251,12 @@
           y: 15,
         },
       ];
+
+      // Keep of the global, mutable state in one place.
+      let state = {
+        field: fieldInit,
+        tets: tetsInit,
+      };
 
       // Is a hypothetical position for a tet invalid?
       const checkTetCollision = (field, { matrix, x, y }) => {
@@ -353,30 +360,24 @@
         };
       };
 
-      const temp = () => {
-        // TODO: Make the global state *this* rather than having multiple globals
-        // (`field`, `tets`).
-        const state = update({ field, tets });
-
-        render(state);
-
-        field = state.field;
-        tets = state.tets;
-      };
+        // Not sure if this is a WAT!? or AMAZE!
+      const tick = () => render(state = update(state));
 
       // TODO: Temp hack: Set up some full / partial rows to check that full-line
       // detection / clearing logic is working.
-      let setFullRow = n => field[n] = mapZeroToN(params.boardWidth)(_ => 'cyan');
+      let setFullRow = (n) => {
+        state.field[n] = mapZeroToN(params.boardWidth)(_ => 'cyan');
+      };
       setFullRow(params.boardHeight - 1);
       setFullRow(params.boardHeight - 2);
       setFullRow(params.boardHeight - 3);
       mapZeroToN(3)((i) => {
-        field[params.boardHeight - 3][i] = null;
-        field[params.boardHeight - 3][i + 5] = null;
+        state.field[params.boardHeight - 3][i] = null;
+        state.field[params.boardHeight - 3][i + 5] = null;
       });
 
-      render({ field, tets });
-      setInterval(temp, 1000);
+      render(state);
+      setInterval(tick, 1000);
     </script>
   </body>
 </html>
