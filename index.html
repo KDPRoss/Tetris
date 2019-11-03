@@ -35,12 +35,17 @@
         yellow: '#ffff00',
       };
 
+      const colourNames = Object.keys(colours).filter(x => x !== 'black');
+
       // Abstract representation of a graphics.
       const line = (x1, y1, x2, y2, colour) => ({ render: 'line', colour, p1: [x1, y1], p2: [x2, y2] });
       const rect = (x1, y1, x2, y2, colour) => ({ render: 'rect', colour, p1: [x1, y1], p2: [x2, y2] });
 
       const iterZeroToN = n => f => new Array(n).fill(null).forEach((_, i) => f(i));
       const mapZeroToN = n => f => new Array(n).fill(null).map((_, i) => f(i));
+
+      const randInt = n => Math.floor(Math.random() * n);
+      const oneOf = xs => xs[randInt(xs.length)];
 
       // Embed these in square matrices for easy rotation!
       const tets = [
@@ -58,9 +63,9 @@
         ],
         // T
         [
-          [0, 0, 0],
           [0, 1, 0],
           [1, 1, 1],
+          [0, 0, 0],
         ],
         // S
         [
@@ -254,12 +259,21 @@
       ];
 
       // TODO: Consider nonuniform probability distribution?
-      const randomTet = () => ({
-        colour: colours.red, // TODO: Random colour.
-        matrix: tets[Math.floor(Math.random() * tets.length)], // TODO: Random rotation.
-        x: Math.floor(params.boardWidth / 2),
-        y: 0,
-      });
+      const randomTet = () => {
+        let matrix = oneOf(tets);
+
+        // Generate any ratation with equal probability.
+        iterZeroToN(randInt(4))((_) => {
+          matrix = rotateClockwise(matrix);
+        });
+
+        return {
+          colour: oneOf(colourNames),
+          matrix,
+          x: Math.floor(params.boardWidth / 2) - 2, // Little bit arbitrary; close to centering them.
+          y: 0,
+        };
+      };
 
       const populateTetQueue = (queue) => {
         const { tetQueueLength } = params;
@@ -273,6 +287,7 @@
       let state = {
         field: fieldInit,
         keysDown: new Set(),
+        paused: false,
         queue: populateTetQueue([]),
         tets: [randomTet()],
       };
@@ -395,8 +410,12 @@
       }
 
       const update = (state) => {
-        const { field, keysDown, queue, tets } = state;
+        const { field, keysDown, paused, queue, tets } = state;
         const tetsUpdated = [];
+
+        if (paused) {
+          return;
+        }
 
         tets.forEach((tet) => {
           const tetMoved = {
@@ -428,6 +447,7 @@
       const downArrow = 40;
       const upArrow = 38;
       const space = 32;
+      const pKey = 80;
 
       const keyDownHandler = (event) => {
         const { keyCode } = event;
@@ -466,6 +486,14 @@
         const tetsUpdated = [];
         let needRerender = false;
 
+        if (keysDown.has(pKey)) {
+          // state.paused = !state.paused;
+        }
+
+        if (state.paused) {
+          return;
+        }
+
         tets.forEach((tet) => {
           const tetMoved = { ...tet };
 
@@ -477,11 +505,13 @@
                 return ++ tetMoved.x;
               case space:
                 return ++ tetMoved.y;
+              // Kind of arbitrary which one does clockwise / anticlockwise; the other mapping
+              // felt weird to me.
               case upArrow:
-                tetMoved.matrix = rotateClockwise(tetMoved.matrix);
+                tetMoved.matrix = rotateAnticlockwise(tetMoved.matrix);
                 return;
               case downArrow:
-                tetMoved.matrix = rotateAnticlockwise(tetMoved.matrix);
+                tetMoved.matrix = rotateClockwise(tetMoved.matrix);
                 return;
             }
           });
