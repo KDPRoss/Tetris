@@ -9,6 +9,95 @@
   <body>
     <canvas id="graphicsCanvas" width="800" height="600"/>
     <script>
+      const canvas = document.getElementById('graphicsCanvas');
+      const ctx = canvas.getContext('2d');
+
+      const params = {
+        // Arbitrary; Internet tells me that 10x20 is 'standard' size.
+        boardHeight: 20, 
+        boardWidth: 10,
+        minX: 0,
+        maxX: 800,
+        minY: 0,
+        maxY: 600,
+        scaleFactor: 4, // Global graphics scaling factor.
+      };
+
+      const colours = {
+        black: '#000000',
+      };
+
+      // Abstract representation of a graphics.
+      const line = (x1, y1, x2, y2, colour) => ({ render: 'line', colour, p1: [x1, y1], p2: [x2, y2] });
+      const rect = (x1, y1, x2, y2, colour) => ({ render: 'rect', colour, p1: [x1, y1], p2: [x2, y2] });
+
+      const iterZeroToN = n => f => new Array(n).fill(null).forEach((_, i) => f(i));
+      const mapZeroToN = n => f => new Array(n).fill(null).map((_, i) => f(i));
+
+      // 'Drawing' will mean render to logical shapes.
+      // Draw the board by drawing a series of vertical / horizontal lines.
+      const drawBoard = () => {
+        const { boardHeight, boardWidth } = params;
+
+        const vertLines = mapZeroToN(boardWidth + 1)(i => line(i, 0, i, boardHeight));
+        const horizLines = mapZeroToN(boardHeight + 1)(i => line(0, i, boardWidth, i));
+
+        return [
+          ...vertLines,
+          ...horizLines,
+        ];
+      };
+
+      // 'Rendering' will take drawn shaps and apply transformations and generate
+      // pixels.
+      const applyTransforms = ts => p => 
+        ts.reduce(
+          ([x, y], t) => {
+            switch(t.transform) {
+              case 'translate':
+                return [x + t.x, y + t.y];
+              case 'scale':
+                return [x * t.x, y * t.y];
+            }
+          },
+          p,
+        );
+
+      const renderObj = ts => obj => {
+        const transform = applyTransforms(ts);
+
+        ctx.strokeStyle = obj.colour || colours.black;
+
+        switch(obj.render) {
+          case 'line':
+            ctx.beginPath();
+            ctx.moveTo(...transform(obj.p1));
+            ctx.lineTo(...transform(obj.p2))
+            return ctx.stroke(); // I can always tell when she gets sassified! https://youtu.be/P7gMkiOPSe
+          case 'rect':
+            return ctx.fillRect(...transform(obj.p1), ...transform(obj.p2));
+        }
+      };
+
+      const temp = () => {
+        const { maxX, maxY, minX, minY } = params;
+        ctx.clearRect(minX, minY, maxX, maxY);
+
+        drawBoard().forEach(renderObj([
+          {
+            transform: 'scale',
+            x: 25,
+            y: 25,
+          },
+          {
+            transform: 'translate',
+            x: 275,
+            y: 50,
+          }
+        ]));
+      };
+
+      setInterval(temp, 1000);
     </script>
   </body>
 </html>
