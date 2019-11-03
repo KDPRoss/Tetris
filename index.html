@@ -92,13 +92,13 @@
       // Could be a bit more clever and use linear algebra ... which would be great if
       // we had hardware support for matrix ops.
       // Assumption: Square matrix.
-      const rotateRight = m => {
+      const rotateAnticlockwise = m => {
         const n = m.length;
-        const res = [];
+        const res = m.map(row => [...row]);
 
-        iterZeroToN(n)((i) => {
-          res.push(mapZeroToN(n)(j => m[j][i]));
-        });
+        iterZeroToN(n)(i => iterZeroToN(n)((j) => {
+          res[i][j] = m[n - j - 1][i];
+        }));
 
         return res;
       }
@@ -230,7 +230,7 @@
 
         tets.forEach((tet) => {
           drawTetromino(tet).forEach(renderer);
-          tet.matrix = rotateRight(tet.matrix);
+          tet.matrix = rotateAnticlockwise(tet.matrix);
         });
 
         drawBoard().forEach(renderer);
