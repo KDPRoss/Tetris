@@ -153,9 +153,9 @@
         iterZeroToN(boardHeight)(i => iterZeroToN(boardWidth)((j) => {
           const colour = field[i][j];
 
-          // if (colour !== null) {
-            res.push(rect(j, i, j + 1, i + 1, colour || black));
-          // }
+          if (colour !== null) {
+            res.push(rect(j, i, j + 1, i + 1, colour));
+          }
         }));
 
         return res;
@@ -253,7 +253,6 @@
               const [iy, jx] = [i + y, j + x];
 
               if (iy < 0 || iy >= boardHeight || jx < 0 || jx >= boardWidth || field[iy][jx] !== null) {
-                console.log(`x=${x}; y=${y}`);
                 return true;
               }
             }
@@ -289,23 +288,10 @@
           }
         ]);
 
-        const rendererField = renderObj([
-          {
-            transform: 'scale',
-            x: 25,
-            y: 25,
-          },
-          {
-            transform: 'translate',
-            x: 0,
-            y: 50,
-          }
-        ]);
-
         const tetsUpdated = [];
 
         tets.forEach((tet) => drawTetromino(tet).forEach(renderer));
-        drawField(field).forEach(rendererField);
+        drawField(field).forEach(renderer);
         drawBoard().forEach(renderer);
 
         tets.forEach((tet) => {
