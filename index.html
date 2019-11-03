@@ -89,6 +89,20 @@
 
       const [tetI, tetO, tetT, tetS, tetZ, tetJ, tetL] = [0, 1, 2, 3, 4, 5, 6, 7];
 
+      // Could be a bit more clever and use linear algebra ... which would be great if
+      // we had hardware support for matrix ops.
+      // Assumption: Square matrix.
+      const rotateRight = m => {
+        const n = m.length;
+        const res = [];
+
+        iterZeroToN(n)((i) => {
+          res.push(mapZeroToN(n)(j => m[j][i]));
+        });
+
+        return res;
+      }
+
       // 'Drawing' will mean render to logical shapes.
       // Draw the board by drawing a series of vertical / horizontal lines.
       const drawBoard = () => {
@@ -152,54 +166,54 @@
         }
       };
 
+      const tets = [
+        {
+          colour: colours.orange,
+          matrix: tetrominoes[tetI],
+          x: 0,
+          y: 0,
+        },
+        {
+          colour: colours.red,
+          matrix: tetrominoes[tetT],
+          x: 5,
+          y: 0,
+        },
+        {
+          colour: colours.green,
+          matrix: tetrominoes[tetO],
+          x: 0,
+          y: 5,
+        },
+        {
+          colour: colours.cyan,
+          matrix: tetrominoes[tetS],
+          x: 5,
+          y: 5,
+        },
+        {
+          colour: colours.magenta,
+          matrix: tetrominoes[tetZ],
+          x: 0,
+          y: 10,
+        },
+        {
+          colour: colours.blue,
+          matrix: tetrominoes[tetJ],
+          x: 5,
+          y: 10,
+        },
+        {
+          colour: colours.yellow,
+          matrix: tetrominoes[tetL],
+          x: 0,
+          y: 15,
+        },
+      ];
+
       const temp = () => {
         const { maxX, maxY, minX, minY } = params;
         ctx.clearRect(minX, minY, maxX, maxY);
-
-        const tets = [
-          {
-            colour: colours.orange,
-            matrix: tetrominoes[tetI],
-            x: 0,
-            y: 0,
-          },
-          {
-            colour: colours.red,
-            matrix: tetrominoes[tetT],
-            x: 5,
-            y: 0,
-          },
-          {
-            colour: colours.green,
-            matrix: tetrominoes[tetO],
-            x: 0,
-            y: 5,
-          },
-          {
-            colour: colours.cyan,
-            matrix: tetrominoes[tetS],
-            x: 5,
-            y: 5,
-          },
-          {
-            colour: colours.magenta,
-            matrix: tetrominoes[tetZ],
-            x: 0,
-            y: 10,
-          },
-          {
-            colour: colours.blue,
-            matrix: tetrominoes[tetJ],
-            x: 5,
-            y: 10,
-          },
-          {
-            colour: colours.yellow,
-            matrix: tetrominoes[tetL],
-            x: 0,
-            y: 15,
-          },
-        ];
 
         const renderer = renderObj([
           {
@@ -214,7 +228,10 @@
           }
         ]);
 
-        tets.forEach(tet => drawTetromino(tet).forEach(renderer));
+        tets.forEach((tet) => {
+          drawTetromino(tet).forEach(renderer);
+          tet.matrix = rotateRight(tet.matrix);
+        });
 
         drawBoard().forEach(renderer);
       };
