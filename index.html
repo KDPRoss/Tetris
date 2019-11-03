@@ -16,15 +16,22 @@
         // Arbitrary; Internet tells me that 10x20 is 'standard' size.
         boardHeight: 20, 
         boardWidth: 10,
-        minX: 0,
         maxX: 800,
-        minY: 0,
         maxY: 600,
+        minX: 0,
+        minY: 0,
         scaleFactor: 4, // Global graphics scaling factor.
       };
 
       const colours = {
         black: '#000000',
+        blue: '#0000ff',
+        cyan: '#00ffff',
+        green: '#00ff00',
+        magenta: '#ff00ff',
+        orange: '#ffa500',
+        red: '#ff0000',
+        yellow: '#ffff00',
       };
 
       // Abstract representation of a graphics.
@@ -33,6 +40,54 @@
 
       const iterZeroToN = n => f => new Array(n).fill(null).forEach((_, i) => f(i));
       const mapZeroToN = n => f => new Array(n).fill(null).map((_, i) => f(i));
+
+      // Embed these in square matrices for easy rotation!
+      const tetrominoes = [
+        // I
+        [
+          [0, 0, 0, 0],
+          [1, 1, 1, 1],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+        ],
+        // O
+        [
+          [1, 1],
+          [1, 1],
+        ],
+        // T
+        [
+          [0, 0, 0],
+          [0, 1, 0],
+          [1, 1, 1],
+        ],
+        // S
+        [
+          [0, 1, 1],
+          [1, 1, 0],
+          [0, 0, 0],
+        ],
+        // Z
+        [
+          [1, 1, 0],
+          [0, 1, 1],
+          [0, 0, 0],
+        ],
+        // J
+        [
+          [1, 0, 0],
+          [1, 1, 1],
+          [0, 0, 0],
+        ],
+        // L
+        [
+          [0, 0, 1],
+          [1, 1, 1],
+          [0, 0, 0],
+        ],
+      ];
+
+      const [tetI, tetO, tetT, tetS, tetZ, tetJ, tetL] = [0, 1, 2, 3, 4, 5, 6, 7];
 
       // 'Drawing' will mean render to logical shapes.
       // Draw the board by drawing a series of vertical / horizontal lines.
@@ -46,6 +101,22 @@
           ...vertLines,
           ...horizLines,
         ];
+      };
+
+      const drawTetromino = ({ colour, matrix, x, y }) => {
+        const res = [];
+
+        matrix.forEach((row, r) => {
+          row.forEach((v, c) => {
+            if (v === 1) {
+              const [xOff, yOff] = [x + r, y + c];
+
+              res.push(rect(xOff, yOff, xOff + 1, yOff + 1, colour));
+            }
+          });
+        });
+
+        return res;
       };
 
       // 'Rendering' will take drawn shaps and apply transformations and generate
@@ -66,16 +137,18 @@
       const renderObj = ts => obj => {
         const transform = applyTransforms(ts);
 
-        ctx.strokeStyle = obj.colour || colours.black;
-
         switch(obj.render) {
           case 'line':
+            ctx.strokeStyle = obj.colour || colours.black;
             ctx.beginPath();
             ctx.moveTo(...transform(obj.p1));
             ctx.lineTo(...transform(obj.p2))
             return ctx.stroke(); // I can always tell when she gets sassified! https://youtu.be/P7gMkiOPSe
           case 'rect':
-            return ctx.fillRect(...transform(obj.p1), ...transform(obj.p2));
+            ctx.fillStyle = obj.colour || colours.black;
+            const [x1, y1] = transform(obj.p1);
+            const [x2, y2] = transform(obj.p2);
+            return ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
         }
       };
 
@@ -83,7 +156,52 @@
         const { maxX, maxY, minX, minY } = params;
         ctx.clearRect(minX, minY, maxX, maxY);
 
-        drawBoard().forEach(renderObj([
+        const tets = [
+          {
+            colour: colours.orange,
+            matrix: tetrominoes[tetI],
+            x: 0,
+            y: 0,
+          },
+          {
+            colour: colours.red,
+            matrix: tetrominoes[tetT],
+            x: 5,
+            y: 0,
+          },
+          {
+            colour: colours.green,
+            matrix: tetrominoes[tetO],
+            x: 0,
+            y: 5,
+          },
+          {
+            colour: colours.cyan,
+            matrix: tetrominoes[tetS],
+            x: 5,
+            y: 5,
+          },
+          {
+            colour: colours.magenta,
+            matrix: tetrominoes[tetZ],
+            x: 0,
+            y: 10,
+          },
+          {
+            colour: colours.blue,
+            matrix: tetrominoes[tetJ],
+            x: 5,
+            y: 10,
+          },
+          {
+            colour: colours.yellow,
+            matrix: tetrominoes[tetL],
+            x: 0,
+            y: 15,
+          },
+        ];
+
+        const renderer = renderObj([
           {
             transform: 'scale',
             x: 25,
@@ -94,7 +212,11 @@
             x: 275,
             y: 50,
           }
-        ]));
+        ]);
+
+        tets.forEach(tet => drawTetromino(tet).forEach(renderer));
+
+        drawBoard().forEach(renderer);
       };
 
       setInterval(temp, 1000);
