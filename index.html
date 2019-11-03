@@ -253,19 +253,20 @@
         },
       ];
 
+      // TODO: Consider nonuniform probability distribution?
+      const randomTet = () => ({
+        colour: colours.red, // TODO: Random colour.
+        matrix: tets[Math.floor(Math.random() * tets.length)], // TODO: Random rotation.
+        x: Math.floor(params.boardWidth / 2),
+        y: 0,
+      });
+
       const populateTetQueue = (queue) => {
         const { tetQueueLength } = params;
-        const { red } = colours;
-
-        // TODO: Consider nonuniform probability distribution?
-        const randomTet = () => ({
-          colour: red, // TODO: Random colour.
-          matrix: tets[Math.floor(Math.random() * tets.length)], // TODO: Random rotation.
-        });
 
         const freshTets = mapZeroToN(tetQueueLength - queue.length)(randomTet);
         
-       return [...queue, ...freshTets];
+        return [...queue, ...freshTets];
       };
 
       // Keep of the global, mutable state in one place.
@@ -273,7 +274,7 @@
         field: fieldInit,
         keysDown: new Set(),
         queue: populateTetQueue([]),
-        tets: tetsInit,
+        tets: [randomTet()],
       };
 
       // Is a hypothetical position for a tet invalid?
@@ -405,6 +406,9 @@
 
           if (checkTetCollision(field, tetMoved)) {
             commitTetToField(field, tet);
+            
+            // Generate a replacement.
+            tetsUpdated.push(queue.shift());
           } else {
             tetsUpdated.push(tetMoved);
           }
@@ -423,6 +427,7 @@
       const leftArrow  = 37;
       const downArrow = 40;
       const upArrow = 38;
+      const space = 32;
 
       const keyDownHandler = (event) => {
         const { keyCode } = event;
@@ -470,6 +475,8 @@
                 return -- tetMoved.x;
               case rightArrow:
                 return ++ tetMoved.x;
+              case space:
+                return ++ tetMoved.y;
               case upArrow:
                 tetMoved.matrix = rotateClockwise(tetMoved.matrix);
                 return;
