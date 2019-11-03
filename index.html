@@ -89,12 +89,14 @@
 
       const [tetI, tetO, tetT, tetS, tetZ, tetJ, tetL] = [0, 1, 2, 3, 4, 5, 6, 7];
 
+      const copyMatrix = m => m.map(row => [...row]);
+
       // Could be a bit more clever and use linear algebra ... which would be great if
       // we had hardware support for matrix ops.
       // Assumption: Square matrix.
       const rotateClockwise = m => {
         const n = m.length;
-        const res = m.map(row => [...row]);
+        const res = copyMatrix(m);
 
         iterZeroToN(n)(i => iterZeroToN(n)((j) => {
           res[n - j - 1][i] = m[i][j];
@@ -104,7 +106,7 @@
       }
       const rotateAnticlockwise = m => {
         const n = m.length;
-        const res = m.map(row => [...row]);
+        const res = copyMatrix(m);
 
         iterZeroToN(n)(i => iterZeroToN(n)((j) => {
           res[i][j] = m[n - j - 1][i];
@@ -133,12 +135,28 @@
         matrix.forEach((row, r) => {
           row.forEach((v, c) => {
             if (v === 1) {
-              const [xOff, yOff] = [x + r, y + c];
+              const [xOff, yOff] = [x + c, y + r];
 
               res.push(rect(xOff, yOff, xOff + 1, yOff + 1, colour));
             }
           });
         });
+
+        return res;
+      };
+
+      const drawField = field => {
+        const { boardHeight, boardWidth } = params;
+        const { black } = colours;
+        const res = [];
+
+        iterZeroToN(boardHeight)(i => iterZeroToN(boardWidth)((j) => {
+          const colour = field[i][j];
+
+          // if (colour !== null) {
+            res.push(rect(j, i, j + 1, i + 1, colour || black));
+          // }
+        }));
 
         return res;
       };
@@ -176,7 +194,9 @@
         }
       };
 
-      const tets = [
+      let field = mapZeroToN(params.boardHeight)(_ => mapZeroToN(params.boardWidth)(_ => null));
+
+      let tets = [
         {
           colour: colours.orange,
           matrix: tetrominoes[tetI],
@@ -221,6 +241,37 @@
         },
       ];
 
+      // Is a hypothetical position for a tet invalid?
+      const checkTetCollision = (field, { matrix, x, y }) => {
+        const { boardHeight, boardWidth } = params;
+        const n = matrix.length;
+
+        // Ugly `for` loops to exit early more straightforwardly.
+        for (let i = 0; i < n; ++ i) {
+          for (let j = 0; j < n; ++ j) {
+            if (matrix[i][j] === 1) {
+              const [iy, jx] = [i + y, j + x];
+
+              if (iy < 0 || iy >= boardHeight || jx < 0 || jx >= boardWidth || field[iy][jx] !== null) {
+                console.log(`x=${x}; y=${y}`);
+                return true;
+              }
+            }
+          }
+        }
+      };
+
+      // In-place: Convert an active tet to part of the background field.
+      const commitTetToField = (field, { colour, matrix, x, y }) => {
+        const n = matrix.length;
+
+        iterZeroToN(n)(i => iterZeroToN(n)((j) => {
+          if (matrix[i][j] === 1) {
+            field[i + y][j + x] = colour;
+          }
+        }));
+      };
+
       const temp = () => {
         const { maxX, maxY, minX, minY } = params;
         ctx.clearRect(minX, minY, maxX, maxY);
@@ -238,12 +289,41 @@
           }
         ]);
 
+        const rendererField = renderObj([
+          {
+            transform: 'scale',
+            x: 25,
+            y: 25,
+          },
+          {
+            transform: 'translate',
+            x: 0,
+            y: 50,
+          }
+        ]);
+
+        const tetsUpdated = [];
+
+        tets.forEach((tet) => drawTetromino(tet).forEach(renderer));
+        drawField(field).forEach(rendererField);
+        drawBoard().forEach(renderer);
+
         tets.forEach((tet) => {
-          drawTetromino(tet).forEach(renderer);
-          tet.matrix = rotateClockwise(tet.matrix);
+          const tetMoved = {
+            ...tet,
+            matrix: rotateClockwise(tet.matrix),
+            y: tet.y + 1,
+          };
+
+          if (checkTetCollision(field, tetMoved)) {
+            commitTetToField(field, tet);
+          } else {
+            tetsUpdated.push(tetMoved);
+          }
+
         });
 
-        drawBoard().forEach(renderer);
+        tets = tetsUpdated;
       };
 
       setInterval(temp, 1000);
