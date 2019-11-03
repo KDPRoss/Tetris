@@ -271,6 +271,7 @@
       // Keep of the global, mutable state in one place.
       let state = {
         field: fieldInit,
+        keysDown: new Set(),
         queue: populateTetQueue([]),
         tets: tetsInit,
       };
@@ -392,8 +393,11 @@
         drawBoard().forEach(renderer);
       }
 
-      const update = ({ field, queue, tets }) => {
+      const update = (state) => {
+        const { field, keysDown, queue, tets } = state;
         const tetsUpdated = [];
+
+        console.log(keysDown);
 
         tets.forEach((tet) => {
           const tetMoved = {
@@ -401,20 +405,57 @@
             y: tet.y + 1,
           };
 
+          keysDown.forEach((keyCode) => {
+            switch(keyCode) {
+              case leftArrow:
+                return -- tetMoved.x;
+              case rightArrow:
+                return ++ tetMoved.x;
+              case upArrow:
+                tetMoved.matrix = rotateClockwise(tetMoved.matrix);
+                return;
+              case downArrow:
+                tetMoved.matrix = rotateAnticlockwise(tetMoved.matrix);
+                return;
+            }
+          });
+
           if (checkTetCollision(field, tetMoved)) {
             commitTetToField(field, tet);
           } else {
             tetsUpdated.push(tetMoved);
           }
-
         });
 
         return {
+          ...state,
           field: clearFullLines(field).field,
           queue: populateTetQueue(queue),
           tets: tetsUpdated,
         };
       };
+
+      // Magical key codes.
+      const rightArrow = 39;
+      const leftArrow  = 37;
+      const downArrow = 40;
+      const upArrow = 38;
+
+      const keyDownHandler = (event) => {
+        const { keyCode } = event;
+
+        if (keyCode) {
+          state.keysDown.add(keyCode);
+        }
+      };
+
+      const keyUpHandler = (event) => {
+        const { keyCode } = event;
+
+        if (keyCode) {
+          state.keysDown.delete(keyCode)
+        }
+      }
 
         // Not sure if this is a WAT!? or AMAZE!
       const tick = () => render(state = update(state));
@@ -431,6 +472,9 @@
         state.field[params.boardHeight - 3][i] = null;
         state.field[params.boardHeight - 3][i + 5] = null;
       });
+
+      document.addEventListener('keydown', keyDownHandler);
+      document.addEventListener('keyup', keyUpHandler);
 
       render(state);
       setInterval(tick, 1000);
