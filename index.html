@@ -12,45 +12,118 @@
       const canvas = document.getElementById('graphicsCanvas');
       const ctx = canvas.getContext('2d');
 
+      // ========== Constants / Parameters ==========
+
       const params = {
         // Arbitrary; Internet tells me that 10x20 is 'standard' size.
         boardHeight: 20, 
         boardWidth: 10,
+        intervalInput: 75,
+        intervalTick: 1000,
         keyRepeatTimeout: 150,
         maxX: 800,
         maxY: 600,
         minX: 0,
         minY: 0,
-        scaleFactor: 4, // Global graphics scaling factor.
-        tetQueueLength: 6,
+        // Assumption: This is at least as long as the `tets` array in the `state`.
+        tetQueueLength: 5, 
       };
 
       const colours = {
         black: '#000000',
-        blue: '#0000ff',
-        cyan: '#00ffff',
-        green: '#00ff00',
+        blue: '#0062eb',
+        cyan: '#6aebee',
+        green: '#77db28',
         grey: '#888888',
-        magenta: '#ff00ff',
-        orange: '#ffa500',
-        red: '#ff0000',
-        yellow: '#ffff00',
+        orange: '#e89d30',
+        red: '#de3e27',
+        purple: '#8b69ec',
+        yellow: '#f5e13a',
       };
 
-      const colourNames = Object.keys(colours).filter(x => !['black', 'grey'].includes(x));
+
+
+      // ========== Basic Combinators ==========
+      const iterZeroToN = n => f => new Array(n).fill(null).forEach((_, i) => f(i));
+      const mapZeroToN = n => f => new Array(n).fill(null).map((_, i) => f(i));
+      const randInt = n => Math.floor(Math.random() * n);
+      const oneOf = xs => xs[randInt(xs.length)];
+
+
+
+      // ========== Simple 2-D Rendering Engine ==========
 
       // Abstract representation of a graphics.
       const line = (x1, y1, x2, y2, colour) => ({ render: 'line', colour, p1: [x1, y1], p2: [x2, y2] });
       const rect = (x1, y1, x2, y2, colour) => ({ render: 'rect', colour, p1: [x1, y1], p2: [x2, y2] });
 
-      const iterZeroToN = n => f => new Array(n).fill(null).forEach((_, i) => f(i));
-      const mapZeroToN = n => f => new Array(n).fill(null).map((_, i) => f(i));
+      // Let's stumble through some ad-hoc linear-algebra functions ...
+      const copyMatrix = m => m.map(row => [...row]);
 
-      const randInt = n => Math.floor(Math.random() * n);
-      const oneOf = xs => xs[randInt(xs.length)];
+      // Assumption: Square matrix.
+      const rotateClockwise = m => {
+        const n = m.length;
+        const res = copyMatrix(m);
 
-      // Embed these in square matrices for easy rotation!
-      // Colours are arbitrary; found >0 online screenshots using this mapping.
+        iterZeroToN(n)(i => iterZeroToN(n)((j) => {
+          res[n - j - 1][i] = m[i][j];
+        }));
+
+        return res;
+      }
+
+      // Assumption: Square matrix.
+      const rotateAnticlockwise = m => {
+        const n = m.length;
+        const res = copyMatrix(m);
+
+        iterZeroToN(n)(i => iterZeroToN(n)((j) => {
+          res[i][j] = m[n - j - 1][i];
+        }));
+
+        return res;
+      }
+
+      // 'Rendering' will take drawn shaps and apply transformations and generate
+      // pixels.
+      const applyTransforms = ts => p => 
+        ts.reduce(
+          ([x, y], t) => {
+            switch(t.transform) {
+              case 'translate':
+                return [x + t.x, y + t.y];
+              case 'scale':
+                return [x * t.x, y * t.y];
+            }
+          },
+          p,
+        );
+
+      const renderObj = ts => obj => {
+        const transform = applyTransforms(ts);
+
+        switch(obj.render) {
+          case 'line':
+            ctx.strokeStyle = obj.colour;
+            ctx.beginPath();
+            ctx.moveTo(...transform(obj.p1));
+            ctx.lineTo(...transform(obj.p2))
+            return ctx.stroke(); // I can always tell when she gets sassified! https://youtu.be/P7gMkiOPSe
+          case 'rect':
+            const [x1, y1] = transform(obj.p1);
+            const [x2, y2] = transform(obj.p2);
+
+            ctx.fillStyle = obj.colour;
+            return ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+        }
+      };
+
+
+
+      // ========== Tetris-Specific Abstractions ==========
+
+      // Embed these in square matrices for easy rotation! Wikipedia tells me that
+      // this is the 'standard' colour scheme (tinyurl.com/y32rmraq).
       const platonicTets = [
         // I
         [
@@ -68,7 +141,7 @@
         ],
         // T
         [
-          'magenta',
+          'purple', // Fitting that the best tet gets the best colour.
           [0, 1, 0],
           [1, 1, 1],
           [0, 0, 0],
@@ -103,39 +176,34 @@
         ],
       ];
 
-      const [tetI, tetO, tetT, tetS, tetZ, tetJ, tetL] = [0, 1, 2, 3, 4, 5, 6, 7];
+      const maxTetSize = Math.max(...platonicTets.map(tet => tet.length));
 
-      const copyMatrix = m => m.map(row => [...row]);
+      // Could use nonuniform distribution.
+      const randomTet = () => {
+        const { boardWidth } = params;
+        let [colour, ...matrix] = oneOf(platonicTets);
 
-      // Could be a bit more clever and use linear algebra ... which would be great if
-      // we had hardware support for matrix ops.
-      // Assumption: Square matrix.
-      const rotateClockwise = m => {
-        const n = m.length;
-        const res = copyMatrix(m);
+        // Generate any ratation with equal probability.
+        iterZeroToN(randInt(4))((_) => {
+          matrix = rotateClockwise(matrix);
+        });
 
-        iterZeroToN(n)(i => iterZeroToN(n)((j) => {
-          res[n - j - 1][i] = m[i][j];
-        }));
+        return {
+          colour,
+          matrix,
+          x: Math.floor(boardWidth / 2) - 2, // Little bit arbitrary; close to centering them.
+          y: 0,
+        };
+      };
 
-        return res;
-      }
-      const rotateAnticlockwise = m => {
-        const n = m.length;
-        const res = copyMatrix(m);
 
-        iterZeroToN(n)(i => iterZeroToN(n)((j) => {
-          res[i][j] = m[n - j - 1][i];
-        }));
 
-        return res;
-      }
+      // ========== Draw Tetris Entities ==========
 
       // 'Drawing' will mean render to logical shapes.
       // Draw the board by drawing a series of vertical / horizontal lines.
       const drawBoard = () => {
         const { boardHeight, boardWidth } = params;
-
         const vertLines = mapZeroToN(boardWidth + 1)(i => line(i, 0, i, boardHeight));
         const horizLines = mapZeroToN(boardHeight + 1)(i => line(0, i, boardWidth, i));
 
@@ -161,20 +229,12 @@
         return res;
       };
 
-      const drawField = field => {
+      const drawField = (field) => {
         const { boardHeight, boardWidth } = params;
         const { black, red } = colours;
         const res = [];
 
         iterZeroToN(boardHeight)((i) => {
-          if (fullLine(field[i])) {
-            // Highlight full row. (We're relying on the assumption that the grid will be
-            // drawn *above* the rects.)
-            res.push(rect(0, i, boardWidth, i + 1, red));
-
-            return;
-          }
-
           iterZeroToN(boardWidth)((j) => {
             const colour = field[i][j];
 
@@ -187,67 +247,48 @@
         return res;
       };
 
-      // 'Rendering' will take drawn shaps and apply transformations and generate
-      // pixels.
-      const applyTransforms = ts => p => 
-        ts.reduce(
-          ([x, y], t) => {
-            switch(t.transform) {
-              case 'translate':
-                return [x + t.x, y + t.y];
-              case 'scale':
-                return [x * t.x, y * t.y];
-            }
-          },
-          p,
-        );
+      const drawTetQueue = (queue) => {
+        const res = [];
+        const padSize = maxTetSize + 2;
 
-      const renderObj = ts => obj => {
-        const transform = applyTransforms(ts);
+        queue.forEach((tet, i) => {
+          const tetToRender = {
+            ...tet,
+            x: 1,
+            y: 1 + i * padSize,
+          };
 
-        switch(obj.render) {
-          case 'line':
-            ctx.strokeStyle = obj.colour || colours.black;
-            ctx.beginPath();
-            ctx.moveTo(...transform(obj.p1));
-            ctx.lineTo(...transform(obj.p2))
-            return ctx.stroke(); // I can always tell when she gets sassified! https://youtu.be/P7gMkiOPSe
-          case 'rect':
-            ctx.fillStyle = obj.colour || colours.black;
-            const [x1, y1] = transform(obj.p1);
-            const [x2, y2] = transform(obj.p2);
-            return ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
-        }
-      };
-
-      const fieldInit = () => mapZeroToN(params.boardHeight)(_ => mapZeroToN(params.boardWidth)(_ => null));
-
-      // TODO: Consider nonuniform probability distribution?
-      const randomTet = () => {
-        let [colour, ...matrix] = oneOf(platonicTets);
-
-        // Generate any ratation with equal probability.
-        iterZeroToN(randInt(4))((_) => {
-          matrix = rotateClockwise(matrix);
+          res.push(...drawTet(tetToRender));
         });
 
-        return {
-          colour,
-          matrix,
-          x: Math.floor(params.boardWidth / 2) - 2, // Little bit arbitrary; close to centering them.
-          y: 0,
-        };
+        // Draw a box to highlight which element of the queue is the next tet.
+        const { matrix } = queue[0];
+        const n = matrix.length + 2;
+
+        iterZeroToN(2)((i) => {
+          res.push(line(i * n, 0, i * n, n, 'black'))
+          res.push(line(0, i * n, n, i * n, 'black'));
+        });
+
+        return res;
       };
+
+
+
+      // ========== Game State ==========
+
+      // The 'field' is the inactive / static grid of blocks 'in the background'.
+      // `null` for empties; colour name for block of relevant colour.
+      const fieldInit = () => mapZeroToN(params.boardHeight)(_ => mapZeroToN(params.boardWidth)(_ => null));
 
       const populateTetQueue = (queue) => {
         const { tetQueueLength } = params;
-
         const freshTets = mapZeroToN(tetQueueLength - queue.length)(randomTet);
         
         return [...queue, ...freshTets];
       };
 
-      // Keep of the global, mutable state in one place.
+      // Keep of the global, mutable state in one place. Hold my monad ...
       let state = {
         field: fieldInit(),
         keysDown: new Set(),
@@ -256,6 +297,10 @@
         queue: populateTetQueue([]),
         tets: [randomTet()],
       };
+
+
+
+      // ========== Game Logic ==========
 
       // Is a hypothetical position for a tet invalid?
       const checkTetCollision = (field, { matrix, x, y }) => {
@@ -268,15 +313,19 @@
             if (matrix[i][j] === 1) {
               const [iy, jx] = [i + y, j + x];
 
+              // Check for out-of-bounds or intersecting with a block in the field. Looks like
+              // I didn't implement 'sprite' collision detection; won't matter.
               if (iy < 0 || iy >= boardHeight || jx < 0 || jx >= boardWidth || field[iy][jx] !== null) {
                 return true;
               }
             }
           }
         }
+
+        return false;
       };
 
-      // In-place: Convert an active tet to part of the background field.
+      // In-place: Convert an active tet 'sprite' to part of the background field.
       const commitTetToField = (field, { colour, matrix, x, y }) => {
         const n = matrix.length;
 
@@ -291,7 +340,6 @@
 
       const clearFullLines = (field) => {
         let { boardHeight, boardWidth } = params;
-
         let res = 0;
         let fieldUpdated = [];
         
@@ -315,7 +363,9 @@
 
       // This behaviour differs to any normal Tetris implementation: If the field is
       // completely filled, just clear it. This is a digital toy, not a game: You
-      // can't win; you can't lose; there's no score.
+      // can't win; you can't lose; there's no score. I'm vaguely tempted to keep
+      // score but not display it. See: The Haldimann H9 'Reduction'.
+      // tinyurl.com/y2ybdj25
       const sanityCheckField = (field, tets) => {
         let res = field;
 
@@ -331,32 +381,17 @@
         return res;
       };
 
-      const drawTetQueue = (queue) => {
-        const res = [];
-        const padSize = 6; // Max tet size is 4; this gives us enough padding.
 
-        queue.forEach((tet, i) => {
-          const tetToRender = {
-            ...tet,
-            x: 1,
-            y: 1 + i * padSize,
-          };
 
-          res.push(...drawTet(tetToRender));
-        });
+      // ========== Game Rendering ==========
 
-        // Draw a box to highlight which element of the queue is the next tet.
-        const { matrix, colour } = queue[0];
-        const n = matrix.length + 2;
-        iterZeroToN(2)((i) => {
-          res.push(line(i * n, 0, i * n, n, 'black'))
-          res.push(line(0, i * n, n, i * n, 'black'));
-        });
-
-        return res;
-      };
-
+      // Render everything; use different renderers for the field / tets + the queue
+      // (both so that they don't get rendered on top of one another and since the
+      // queue is rendered in miniature).
       const render = ({ field, paused, queue, tets }) => {
+        const { boardHeight, boardWidth, maxX, maxY, minX, minY } = params;
+        const { grey } = colours;
+
         const renderer = renderObj([
           {
             transform: 'scale',
@@ -367,7 +402,7 @@
             transform: 'translate',
             x: 275,
             y: 50,
-          }
+          },
         ]);
 
         const rendererQueue = renderObj([
@@ -380,18 +415,13 @@
             transform: 'translate',
             x: 150,
             y: 50,
-          }
+          },
         ]);
 
-        const { maxX, maxY, minX, minY } = params;
         ctx.clearRect(minX, minY, maxX, maxY);
-
         drawTetQueue(queue).forEach(rendererQueue);
 
         if (paused) {
-          const { grey } = colours;
-          const { boardHeight, boardWidth } = params;
-
           renderer(rect(0, 0, boardWidth, boardHeight, grey));
         } else {
           tets.forEach((tet) => drawTet(tet).forEach(renderer));
@@ -416,9 +446,9 @@
           };
 
           if (checkTetCollision(field, tetMoved)) {
+            // Convert the 'sprite' to part of the field and pluck a replacement from the
+            // queue.
             commitTetToField(field, tet);
-            
-            // Generate a replacement.
             tetsUpdated.push(queue.shift());
           } else {
             tetsUpdated.push(tetMoved);
@@ -433,35 +463,36 @@
         };
       };
 
+
+
+      // ========== Input Handling ==========
+
       // Magical key codes.
-      const rightArrow = 39;
-      const leftArrow  = 37;
       const downArrow = 40;
-      const upArrow = 38;
-      const space = 32;
+      const leftArrow  = 37;
       const pKey = 80;
+      const rightArrow = 39;
+      const space = 32;
+      const upArrow = 38;
 
-      const keyDownHandler = (event) => {
-        const { keyCode } = event;
-
+      const keyDownHandler = ({ keyCode }) => {
         if (keyCode) {
           state.keysDown.add(keyCode);
         }
       };
 
-      const keyUpHandler = (event) => {
-        const { keyCode } = event;
-
+      const keyUpHandler = ({ keyCode }) => {
         if (keyCode) {
           state.keysDown.delete(keyCode)
         }
       }
 
-        // Not sure if this is a WAT!? or AMAZE!
-      const tick = () => render(state = update(state));
+      const enableInput = () => {
+        state.keyRepeatDisabled = false;
+      }
 
       const handleInput = () => {
-        const { field, keysDown, paused, tets } = state;
+        const { field, keysDown, tets } = state;
         const tetsUpdated = [];
         let needRerender = false;
 
@@ -472,7 +503,14 @@
 
           // Bit of a hack: Difficult to get a *single* pause event to register, else.
           state.keyRepeatDisabled = true;
-          setTimeout(() => state.keyRepeatDisabled = false, keyRepeatTimeout);
+          setTimeout(enableInput, keyRepeatTimeout);
+
+          // Force a rerender when switching between paused / unpaused.
+          if (state.paused) {
+            render(state);
+          } else {
+            needRerender = true;
+          }
         }
 
         if (state.paused) {
@@ -490,17 +528,17 @@
                 return ++ tetMoved.x;
               case space:
                 return ++ tetMoved.y;
-              // Kind of arbitrary which one does clockwise / anticlockwise; the other mapping
+              // Totally arbitrary which one does clockwise / anticlockwise; the other mapping
               // felt weird to me.
               case upArrow:
-                tetMoved.matrix = rotateAnticlockwise(tetMoved.matrix);
-                return;
+                return tetMoved.matrix = rotateAnticlockwise(tetMoved.matrix);
               case downArrow:
-                tetMoved.matrix = rotateClockwise(tetMoved.matrix);
-                return;
+                return tetMoved.matrix = rotateClockwise(tetMoved.matrix);
             }
           });
 
+          // Reject moves that would result in any portion of the tet intersecting with
+          // the field / being out-of-bounds.
           if (checkTetCollision(field, tetMoved)) {
             tetsUpdated.push(tet);
           } else {
@@ -511,8 +549,6 @@
 
         state = {
           ...state,
-          field,
-          keysDown,
           tets: tetsUpdated,
         }
 
@@ -521,12 +557,21 @@
         }
       };
 
-      document.addEventListener('keydown', keyDownHandler);
-      document.addEventListener('keyup', keyUpHandler);
+
+
+      // ========== Tie Everything Together ==========
+
+        // Not sure if this is WAT!? or AMAZE!
+      const tick = () => {
+        state = update(state);
+        render(state);
+      };
 
       render(state);
-      setInterval(handleInput, 75);
-      setInterval(tick, 1000);
+      document.addEventListener('keydown', keyDownHandler);
+      document.addEventListener('keyup', keyUpHandler);
+      setInterval(handleInput, params.intervalInput);
+      setInterval(tick, params.intervalTick);
     </script>
   </body>
 </html>
