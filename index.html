@@ -475,22 +475,6 @@
       const space = 32;
       const upArrow = 38;
 
-      const keyDownHandler = ({ keyCode }) => {
-        if (keyCode) {
-          state.keysDown.add(keyCode);
-        }
-      };
-
-      const keyUpHandler = ({ keyCode }) => {
-        if (keyCode) {
-          state.keysDown.delete(keyCode)
-        }
-      }
-
-      const enableInput = () => {
-        state.keyRepeatDisabled = false;
-      }
-
       const handleInput = () => {
         const { field, keysDown, tets } = state;
         const tetsUpdated = [];
@@ -556,6 +540,23 @@
           render(state);
         }
       };
+
+      const keyDownHandler = ({ keyCode }) => {
+        if (keyCode) {
+          state.keysDown.add(keyCode);
+        }
+      };
+
+      const keyUpHandler = ({ keyCode }) => {
+        if (keyCode) {
+          state.keysDown.delete(keyCode)
+          handleInput();
+        }
+      }
+
+      const enableInput = () => {
+        state.keyRepeatDisabled = false;
+      }
 
 
 
