@@ -16,7 +16,7 @@
 
       const params = {
         // Arbitrary; Internet tells me that 10x20 is 'standard' size.
-        boardHeight: 20, 
+        boardHeight: 20,
         boardWidth: 10,
         intervalInput: 75,
         intervalTick: 1000,
@@ -26,7 +26,7 @@
         minX: 0,
         minY: 0,
         // Assumption: This is at least as long as the `tets` array in the `state`.
-        tetQueueLength: 5, 
+        tetQueueLength: 5,
       };
 
       const colours = {
@@ -86,7 +86,7 @@
 
       // 'Rendering' will take drawn shaps and apply transformations and generate
       // pixels.
-      const applyTransforms = ts => p => 
+      const applyTransforms = ts => p =>
         ts.reduce(
           ([x, y], t) => {
             switch(t.transform) {
@@ -284,7 +284,7 @@
       const populateTetQueue = (queue) => {
         const { tetQueueLength } = params;
         const freshTets = mapZeroToN(tetQueueLength - queue.length)(randomTet);
-        
+
         return [...queue, ...freshTets];
       };
 
@@ -342,7 +342,7 @@
         let { boardHeight, boardWidth } = params;
         let res = 0;
         let fieldUpdated = [];
-        
+
         field.forEach((row) => {
           if (fullLine(row)) {
             ++ res;
