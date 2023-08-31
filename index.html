@@ -15,7 +15,8 @@
       // ========== Constants / Parameters ==========
 
       const params = {
-        // Arbitrary; Internet tells me that 10x20 is 'standard' size.
+        // Arbitrary; Internet tells me that 10x20 is 'standard'
+        // size.
         boardHeight: 20,
         boardWidth: 10,
         intervalInput: 75,
@@ -25,7 +26,8 @@
         maxY: 600,
         minX: 0,
         minY: 0,
-        // Assumption: This is at least as long as the `tets` array in the `state`.
+        // Assumption: This is at least as long as the `tets` array
+        // in the `state`.
         tetQueueLength: 5,
       };
 
@@ -57,7 +59,8 @@
       const line = (x1, y1, x2, y2, colour) => ({ render: 'line', colour, p1: [x1, y1], p2: [x2, y2] });
       const rect = (x1, y1, x2, y2, colour) => ({ render: 'rect', colour, p1: [x1, y1], p2: [x2, y2] });
 
-      // Let's stumble through some ad-hoc linear-algebra functions ...
+      // Let's stumble through some ad-hoc linear-algebra
+      // functions ...
       const copyMatrix = m => m.map(row => [...row]);
 
       // Assumption: Square matrix.
@@ -84,8 +87,8 @@
         return res;
       }
 
-      // 'Rendering' will take drawn shaps and apply transformations and generate
-      // pixels.
+      // 'Rendering' will take drawn shapes and apply
+      // transformations and generate pixels.
       const applyTransforms = ts => p =>
         ts.reduce(
           ([x, y], t) => {
@@ -122,8 +125,10 @@
 
       // ========== Tetris-Specific Abstractions ==========
 
-      // Embed these in square matrices for easy rotation! Wikipedia tells me that
-      // this is the 'standard' colour scheme (tinyurl.com/y32rmraq).
+      // Embed these in square matrices for easy rotation!
+      // Wikipedia tells me that this is the 'standard' colour
+      // scheme
+      // (https://en.wikipedia.org/wiki/Tetris#Tetromino_colors).
       const platonicTets = [
         // I
         [
@@ -200,8 +205,8 @@
 
       // ========== Draw Tetris Entities ==========
 
-      // 'Drawing' will mean render to logical shapes.
-      // Draw the board by drawing a series of vertical / horizontal lines.
+      // 'Drawing' will mean render to logical shapes. Draw the
+      // board by drawing a series of vertical / horizontal lines.
       const drawBoard = () => {
         const { boardHeight, boardWidth } = params;
         const vertLines = mapZeroToN(boardWidth + 1)(i => line(i, 0, i, boardHeight));
@@ -261,7 +266,8 @@
           res.push(...drawTet(tetToRender));
         });
 
-        // Draw a box to highlight which element of the queue is the next tet.
+        // Draw a box to highlight which element of the queue is the
+        // next tet.
         const { matrix } = queue[0];
         const n = matrix.length + 2;
 
@@ -277,8 +283,9 @@
 
       // ========== Game State ==========
 
-      // The 'field' is the inactive / static grid of blocks 'in the background'.
-      // `null` for empties; colour name for block of relevant colour.
+      // The 'field' is the inactive / static grid of blocks 'in
+      // the background'. `null` for empties; colour name for
+      // block of relevant colour.
       const fieldInit = () => mapZeroToN(params.boardHeight)(_ => mapZeroToN(params.boardWidth)(_ => null));
 
       const populateTetQueue = (queue) => {
@@ -288,7 +295,8 @@
         return [...queue, ...freshTets];
       };
 
-      // Keep of the global, mutable state in one place. Hold my monad ...
+      // Keep of the global, mutable state in one place. Hold my
+      // monad ...
       let state = {
         field: fieldInit(),
         keysDown: new Set(),
@@ -313,8 +321,9 @@
             if (matrix[i][j] === 1) {
               const [iy, jx] = [i + y, j + x];
 
-              // Check for out-of-bounds or intersecting with a block in the field. Looks like
-              // I didn't implement 'sprite' collision detection; won't matter.
+              // Check for out-of-bounds or intersecting with a block in
+              // the field. Looks like I didn't implement 'sprite'
+              // collision detection; won't matter.
               if (iy < 0 || iy >= boardHeight || jx < 0 || jx >= boardWidth || field[iy][jx] !== null) {
                 return true;
               }
@@ -325,7 +334,8 @@
         return false;
       };
 
-      // In-place: Convert an active tet 'sprite' to part of the background field.
+      // In-place: Convert an active tet 'sprite' to part of the
+      // background field.
       const commitTetToField = (field, { colour, matrix, x, y }) => {
         const n = matrix.length;
 
@@ -361,18 +371,21 @@
         };
       };
 
-      // This behaviour differs to any normal Tetris implementation: If the field is
-      // completely filled, just clear it. This is a digital toy, not a game: You
-      // can't win; you can't lose; there's no score. I'm vaguely tempted to keep
-      // score but not display it. See: The Haldimann H9 'Reduction'.
-      // tinyurl.com/y2ybdj25
+      // This behaviour differs to any normal Tetris
+      // implementation: If the field is completely filled, just
+      // clear it. This is a digital toy, not a game: You can't
+      // win; you can't lose; there's no score. I'm vaguely
+      // tempted to keep score but not display it. See: The
+      // Haldimann H9 'Reduction'.
+      // (https://www.ablogtowatch.com/haldimann-h9-reduction-watch/).
       const sanityCheckField = (field, tets) => {
         let res = field;
 
         tets.forEach((tet) => {
-          // This should only happen if a freshly-generated tet is in an invalid position,
-          // which should only happen if the field is totally full. Proof is left as an
-          // exercise for the reader.
+          // This should only happen if a freshly-generated tet is in
+          // an invalid position, which should only happen if the
+          // field is totally full. Proof is left as an exercise for
+          // the reader.
           if (checkTetCollision(field, tet)) {
             res = fieldInit();
           }
@@ -385,9 +398,10 @@
 
       // ========== Game Rendering ==========
 
-      // Render everything; use different renderers for the field / tets + the queue
-      // (both so that they don't get rendered on top of one another and since the
-      // queue is rendered in miniature).
+      // Render everything; use different renderers for the field
+      // / tets + the queue (both so that they don't get rendered
+      // on top of one another and since the queue is rendered in
+      // miniature).
       const render = ({ field, paused, queue, tets }) => {
         const { boardHeight, boardWidth, maxX, maxY, minX, minY } = params;
         const { grey } = colours;
@@ -446,8 +460,8 @@
           };
 
           if (checkTetCollision(field, tetMoved)) {
-            // Convert the 'sprite' to part of the field and pluck a replacement from the
-            // queue.
+            // Convert the 'sprite' to part of the field and pluck a
+            // replacement from the queue.
             commitTetToField(field, tet);
             tetsUpdated.push(queue.shift());
           } else {
@@ -485,11 +499,13 @@
 
           state.paused = !state.paused;
 
-          // Bit of a hack: Difficult to get a *single* pause event to register, else.
+          // Bit of a hack: Difficult to get a *single* pause event to
+          // register, else.
           state.keyRepeatDisabled = true;
           setTimeout(enableInput, keyRepeatTimeout);
 
-          // Force a rerender when switching between paused / unpaused.
+          // Force a rerender when switching between paused /
+          // unpaused.
           if (state.paused) {
             render(state);
           } else {
@@ -512,8 +528,8 @@
                 return ++ tetMoved.x;
               case space:
                 return ++ tetMoved.y;
-              // Totally arbitrary which one does clockwise / anticlockwise; the other mapping
-              // felt weird to me.
+              // Totally arbitrary which one does clockwise /
+              // anticlockwise; the other mapping felt weird to me.
               case upArrow:
                 return tetMoved.matrix = rotateAnticlockwise(tetMoved.matrix);
               case downArrow:
@@ -521,8 +537,8 @@
             }
           });
 
-          // Reject moves that would result in any portion of the tet intersecting with
-          // the field / being out-of-bounds.
+          // Reject moves that would result in any portion of the tet
+          // intersecting with the field / being out-of-bounds.
           if (checkTetCollision(field, tetMoved)) {
             tetsUpdated.push(tet);
           } else {
